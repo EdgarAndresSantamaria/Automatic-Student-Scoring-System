@@ -1,0 +1,278 @@
+
+ correlation report: 
+
+ question: Explain why you got a voltage reading of 1.5 for terminal 1 and the positive terminal.
+ 
+ given information:
+
+ reference: terminal 1 is not separated from the negative battery terminal 		 answer: Terminal 1 is connected to the positive battery terminal. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [3.8376303] 		 estimated score: [1] 		 estimated mark: 7 
+ 
+ given information:
+
+ reference: terminal 1 is not separated from the negative battery terminal 		 answer: because it was connected to the positive terminal. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.7686296] 		 estimated score: [1] 		 estimated mark: 5 
+ 
+ given information:
+
+ reference: terminal 1 is not separated from the negative battery terminal 		 answer: the positive terminal 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.8294713] 		 estimated score: [1] 		 estimated mark: 5 
+ 
+ given information:
+
+ reference: terminal 1 is not separated from the negative battery terminal 		 answer: the bulb was not damaged 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.981206] 		 estimated score: [1] 		 estimated mark: 1 
+
+
+ correlation report: 
+
+ question: Look at the diagram of a circuit at the right. Will the motor run? Why?
+ 
+ given information:
+
+ reference: The circuit is not complete. The electrical pathway is broken. 		 answer: There is no source. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.8950343] 		 estimated score: [0] 		 estimated mark: 1 
+
+
+ correlation report: 
+
+ question: Explain why you got a voltage reading of 0 for terminal 1 and terminal 2.
+ 
+ given information:
+
+ reference: There is no gap between them 		 answer: there was no gap between the positive battery terminal and terminal 1 and terminal 2. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [1.8436238] 		 estimated score: [1] 		 estimated mark: 3 
+
+
+ correlation report: 
+
+ question: Elena has a male lizard that has lived for several years in the habitat she provided. She knows that some lizards are territorial. Besides additional food and water, what should she be sure to include in the habitat before she adds another male lizard?
+ 
+ given information:
+
+ reference: Elena should include a separate shelter for each lizard. 		 answer: She should add another shelter. 
+ score: correct 
+
+ results:
+
+ estimated similarity: [2.5420654] 		 estimated score: [0] 		 estimated mark: 5 
+ 
+ given information:
+
+ reference: Elena should include a separate shelter for each lizard. 		 answer: Water and food. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.7210027] 		 estimated score: [0] 		 estimated mark: 1 
+ 
+ given information:
+
+ reference: Elena should include a separate shelter for each lizard. 		 answer: Grass. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.65014404] 		 estimated score: [0] 		 estimated mark: 1 
+
+
+ correlation report: 
+
+ question: Why does measuring voltage help you locate a burned out bulb? Try to answer in terms of electrical states, connections and/ or a gap.
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: because no difference in the electrical states of two terminals in a connection is where the gap is. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.5605087] 		 estimated score: [1] 		 estimated mark: 5 
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: there will be a gap between the positive battery terminal and the bulb terminal 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.3404899] 		 estimated score: [1] 		 estimated mark: 4 
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: an electircl aasoidrjf 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.21556135] 		 estimated score: [1] 		 estimated mark: 0 
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: a bulb causes a difference in electrical state 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [1.4703401] 		 estimated score: [1] 		 estimated mark: 2 
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: a gap causes a chemical reaction 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.92418087] 		 estimated score: [1] 		 estimated mark: 1 
+ 
+ given information:
+
+ reference: A zero voltage means that the terminals are connected. 		 answer: Because when you measure the difference in electrical states of two terminals, if they are connected the reading will be 0.  If they are separated by a gap, the reading will be 1.5 V. 
+ score: correct 
+
+ results:
+
+ estimated similarity: [2.5791867] 		 estimated score: [1] 		 estimated mark: 5 
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:344: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+/home/medysn/Desktop/LAP9/App_april/semeval-2013-2-and-3-way/final_semeval.py:408: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`).
+  fig = plt.figure(figsize=(16, 16))
+
+
+ correlation report: 
+
+ question: Explain your reasoning.
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: they are not within a closed path 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.0962386] 		 estimated score: [1] 		 estimated mark: 4 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: They are not contained inthe same closed path 
+ score: correct 
+
+ results:
+
+ estimated similarity: [3.1952555] 		 estimated score: [1] 		 estimated mark: 6 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: they have different closed paths 
+ score: correct 
+
+ results:
+
+ estimated similarity: [1.5825019] 		 estimated score: [1] 		 estimated mark: 3 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: I accounted for B when it wasn"t pertinant to the question 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.91090965] 		 estimated score: [1] 		 estimated mark: 1 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: bulb a and c are in different circuits 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [1.8186252] 		 estimated score: [1] 		 estimated mark: 3 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: They are not contained on the same path 
+ score: correct 
+
+ results:
+
+ estimated similarity: [3.4668543] 		 estimated score: [1] 		 estimated mark: 6 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: bulb a and c are not contained within the same closed path 
+ score: correct 
+
+ results:
+
+ estimated similarity: [3.77749] 		 estimated score: [1] 		 estimated mark: 7 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: they are on a different closed path 
+ score: correct 
+
+ results:
+
+ estimated similarity: [2.0077004] 		 estimated score: [1] 		 estimated mark: 4 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: bulbs b and c are contiained in the the same path with the battery. 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [2.1491306] 		 estimated score: [1] 		 estimated mark: 4 
+ 
+ given information:
+
+ reference: A and C are not in the same path 		 answer: yes 
+ score: incorrect 
+
+ results:
+
+ estimated similarity: [0.77539504] 		 estimated score: [0] 		 estimated mark: 1 
+
+Process finished with exit code 0
