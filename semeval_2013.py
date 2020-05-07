@@ -13,7 +13,7 @@ from flair.models import SequenceTagger
 from segtok.segmenter import split_single
 # similarity imports (estimator)
 from semantic_text_similarity.models import WebBertSimilarity
-# retrieve / save models ( (de) serializtion protocol)
+# retrieve / save models ( (de)serializtion protocol)
 import pickle
 
 '''
@@ -62,6 +62,7 @@ class Preprocessor:
         return loaded_embeddings
 
     def sentences_to_padded_index_sequences(self, datasets):
+        sntLen = []
         '''Annotates datasets with feature vectors.'''
         PADDING = "<PAD>"
         UNKNOWN = "<UNK>"
@@ -89,6 +90,7 @@ class Preprocessor:
 
                     token_sequence = tokenize(example[sentence])
                     padding =  self.Sentence_len - len(token_sequence)
+                    sntLen . append(len(token_sequence))
 
                     for i in range( self.Sentence_len):
                         if i >= padding:
@@ -99,6 +101,8 @@ class Preprocessor:
                         else:
                             index = word_indices[PADDING]
                         example[sentence + '_index_sequence'][i] = index
+
+        print("The larger sentence has {} tokens".format(max(sntLen)))
         return indices_to_words, word_indices
 
     def load_semeval(self, snli_home):
@@ -212,7 +216,7 @@ class Preprocessor:
                 f.write(json.dumps(cur_json) + "\n")
 
 # shared vars
-Sentence_len = 20
+Sentence_len = 20 # larger sentence 110
 # ----------------------------------------------------------------
 # Preprocess data (calculates chunking and POS tagging with FLAIR so may take it's time)
 #preprocessor = Preprocessor(Sentence_len, preprocess=True)
@@ -238,7 +242,7 @@ class SimmilarityClassifier():
         self.labelmap = labelmap
         self.web_model = WebBertSimilarity(device='cpu', batch_size=10)  # defaults to GPU prediction
         # Define the hyperparameters
-        self.training_epochs = 1  # How long to train for - chosen to fit within class time
+        self.training_epochs = 100  # How long to train for - chosen to fit within class time
         self.display_epoch_freq = 1  # How often to print cost (in epochs)
         self.display_step_freq = 11  # How often to test (in steps)
         self.dim = sequence_length  # The dimension of the hidden state of each RNN
@@ -248,11 +252,13 @@ class SimmilarityClassifier():
         self.sequence_length = sequence_length  # Defined by the file reader above
         self.step = 1
         self.epoch = 0
+        self.max_patience = 5
+        self.l2_lambda = 0.001
         # Define the parameters
         self.trainable_variables = []
         self.E = tf.Variable(loaded_embeddings, trainable=False)
         self.trainable_variables.append(self.E)
-        # TODO: Define the parameters of the GRUs
+        # Define the parameters of the GRUs
         #  - Note that we need to learn two GRUs:
         #  - Use Figure above to understand how you can organize you GRU models.
         # params for encoding (premise) , decoding (hypothesis) and attention Weights (attention) GRU
@@ -299,18 +305,18 @@ class SimmilarityClassifier():
             self.trainable_variables.append(self.W_z[self.name])
             self.trainable_variables.append(self.b_z[self.name])
 
-            # TODO: Define the attention parameters.
-            #  - Attention parameters: You need to define just one variable that learns matching
-            #    premise and hypothesis sequences.
-            self.attn = tf.Variable(tf.random.normal([2 * self.dim, 2 * self.dim], stddev=0.1))
-            self.trainable_variables.append(self.attn)
+        # Define the attention parameters.
+        #  - Attention parameters: You need to define just one variable that learns matching
+        #    premise and hypothesis sequences.
+        self.attn = tf.Variable(tf.random.normal([2 * self.dim, 2 * self.dim], stddev=0.1))
+        self.trainable_variables.append(self.attn)
 
         #  - Attention score is defined in eq. 8 in Luong et al. (general score)
         #  - This simplify eq.6 in Wang and Jiang for the attention score.
         #    self.score = tf.Variable(tf.random.normal([self.dim , self.dim], stddev=0.1))
         #  - Hint: What are the dimensionality of vectors of both side in the equation?
 
-        # TODO: Define the paremeters for the classification layer (as in Lab5).
+        # Define the paremeters for the classification layer (as in Lab5).
         self.w_cl = tf.Variable(tf.random.normal([self.dim, 2], stddev=0.1))
         self.trainable_variables.append(self.w_cl)
         self.b_cl = tf.Variable(tf.random.normal([2], stddev=0.1))
@@ -320,9 +326,32 @@ class SimmilarityClassifier():
         return self.trainable_variables
 
     def setup_params(self, trainable_variables):
+        ind = 0
         self.trainable_variables = trainable_variables
+        self.E = trainable_variables[ind]
+        ind +=1
+        for self.name in ['p', 'h', 'm']:
+            self.W_rnn[self.name] = trainable_variables[ind]
+            ind += 1
+            self.b_rnn[self.name] = trainable_variables[ind]
+            ind += 1
+            self.W_r[self.name] = trainable_variables[ind]
+            ind += 1
+            self.b_r[self.name] = trainable_variables[ind]
+            ind += 1
+            self.W_z[self.name] = trainable_variables[ind]
+            ind += 1
+            self.b_z[self.name] = trainable_variables[ind]
+            ind += 1
+
+        self.attn = trainable_variables[ind]
+        ind += 1
+        self.w_cl = trainable_variables[ind]
+        ind += 1
+        self.b_cl = trainable_variables[ind]
 
     # define the GRU function (Hint: check lab 5)
+    # todo update into LSTM
     def gru(self, emb, h_prev, name):
         emb_h_prev = tf.concat([emb, h_prev], 1, name=name + '_emb_h_prev')
         z = tf.nn.sigmoid(tf.matmul(emb_h_prev, self.W_z[name]) + self.b_z[name], name=name + '_z')
@@ -456,8 +485,10 @@ class SimmilarityClassifier():
                 f.write(" \n given information:\n\n reference: {} \t\t answer: {} \n score: {} \n\n results:\n\n estimated similarity: {} \t\t estimated score: {} \t\t estimated mark: {} ".format(example["reference_answer"], example["student_answer"], example["grade"], similarity, self.labelmap[int(grade)], estimated_mark))
 
     # Define the model: Complete the functions
-    # paper = REASONING ABOUTENTAILMENT WITHNEURALATTENTION (Rocktäschel's)
+    # paper = REASONING ABOUT ENTAILMENT WITH NEURAL ATTENTION (Rocktäschel's)
     def model(self, premise_x, hypothesis_x):
+        # todo apply dropout technique to avoid overfitting (think about how ...)
+
         def premise_step(x, h_prev):
             # - Note that attention mechanism is inside premise step (local calculation).
             emb = tf.nn.embedding_lookup(self.E, x)
@@ -501,19 +532,19 @@ class SimmilarityClassifier():
         for t in range(self.sequence_length):
             x_t = tf.reshape(self.x_premise_slices[t], [-1])
             # 1.calculate the state of every premise step.
-            # TODO 2.calculate a part of the function of the bilinear attention scoring of each time step: projected_premise_step
+            # calculate a part of the function of the bilinear attention scoring of each time step: projected_premise_step
             premise_h_prev, projected_premise = premise_step(x_t, premise_h_prev)
             # keep all the premise steps and projected premise steps
             premise_steps.append(premise_h_prev)
             projected_premise_steps.append(projected_premise)
             # Unroll the second RNN (Hypothesis). (Hint: check lab 5)
+
         self.hyp_zero = tf.zeros(tf.stack([tf.shape(hypothesis_x)[0], self.dim]))
         self.h_prev_attn_weights = tf.zeros(
             tf.stack([tf.shape(hypothesis_x)[0], self.dim]))  # which is the shape of attention word 2 word ??
         # re-init because really h_prev_attn_weights is learning (word2word), we extract the result from there
         h_prev_hypothesis = self.hyp_zero
         h_prev_attn_weights = self.h_prev_attn_weights
-        # print("attention initial shape {}".format(tf.shape(h_prev_attn_weights)))
         attn_weights_steps = []
         for t in range(self.sequence_length):
             x_t = tf.reshape(self.x_hypothesis_slices[t], [-1])
@@ -523,6 +554,7 @@ class SimmilarityClassifier():
                                                                      premise_steps, projected_premise_steps)
             attn_weights_steps.append(h_prev_attn_weights)
             # 2. keep the attention weights of each step.
+
         logits = tf.matmul(h_prev_attn_weights, self.w_cl) + self.b_cl  # compute logits for classification (3 classes)
         attn = tf.stack(attn_weights_steps, 1)  # stack weights for plotting functions (example_len, sequence_len, dim)
         # we provide logits as prediction function (over last attn_step) and attn_steps as attention word2word for each premise | hypothesis
@@ -530,6 +562,7 @@ class SimmilarityClassifier():
 
     def train(self, training_data, dev_data):
         print('Training.')
+        self.best_dev = 0
         # Training cycle
         train_acc = []
         dev_acc = []
@@ -550,10 +583,22 @@ class SimmilarityClassifier():
                 # cost function for logging
                 with tf.GradientTape() as tape:
                     logits, _ , = self.model(minibatch_premise_vectors, minibatch_hypothesis_vectors)
-                    # todo implement L2 regularizers
-
+                    # implement L2 regularizers (avoid overfitting)
+                    l2_cost = self.l2_lambda * (tf.reduce_sum(tf.square(self.W_rnn['p'])) +
+                                                tf.reduce_sum(tf.square(self.W_rnn['h'])) +
+                                                tf.reduce_sum(tf.square(self.W_rnn['m'])) +
+                                                tf.reduce_sum(tf.square(self.W_r['p'])) +
+                                                tf.reduce_sum(tf.square(self.W_r['h'])) +
+                                                tf.reduce_sum(tf.square(self.W_r['m'])) +
+                                                tf.reduce_sum(tf.square(self.W_z['p'])) +
+                                                tf.reduce_sum(tf.square(self.W_z['h'])) +
+                                                tf.reduce_sum(tf.square(self.W_z['m'])) +
+                                                tf.reduce_sum(tf.square(self.w_cl)) +
+                                                tf.reduce_sum(tf.square(self.attn))
+                                                )
+                    # costs curve ...
                     # Define the cost function (here, the softmax exp and sum are built in)
-                    total_cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=minibatch_labels))
+                    total_cost = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=minibatch_labels)+l2_cost)
 
                 # This  performs the main SGD update equation with gradient clipping using Adam algorithm
                 optimizer_obj = tf.optimizers.Adam()
@@ -561,13 +606,17 @@ class SimmilarityClassifier():
                 gvs = zip(gradients, self.trainable_variables)
                 capped_gvs = [(tf.clip_by_norm(grad, 5.0), var) for grad, var in gvs if grad is not None]
                 optimizer_obj.apply_gradients(capped_gvs)
+                # averaged costs curve ...
+                avg_cost += total_cost / total_batch
 
                 if self.step % self.display_step_freq == 0:
-                    print("Step:", self.step, "Dev acc:", self.evaluate_classifier(dev_data[0:1000]), \
-                          "Train acc:", self.evaluate_classifier(training_data[0:1000]))
+                    tf.print("Step:", self.step,
+                             "Dev acc:", self.evaluate_classifier(dev_data[0:1000]),
+                             "Train acc:", self.evaluate_classifier(training_data[0:1000]),
+                             "Avg Cost:", avg_cost,
+                             "total step Cost :", total_cost)
 
                 self.step += 1
-                avg_cost += total_cost / (total_batch * self.batch_size)
 
             # Display some statistics about the step
             # Evaluating only one batch worth of data -- simplifies implementation slightly
@@ -575,12 +624,30 @@ class SimmilarityClassifier():
                 dev_acc.append(self.evaluate_classifier(dev_data[0:1000]))
                 train_acc.append(self.evaluate_classifier(training_data[0:1000]))
                 epochs.append(self.epoch + 1)
+                # improved the early stopping and the retrieving of the best model (params)
+                # patience mechanism regarding the traceback of best dev metric
+                if dev_acc[len(dev_acc) - 1] <= self.best_dev:
+                    self.patience += 1
+                    print(" {} epochs without improvement".format(self.patience))
+                    if self.patience == self.max_patience:
+                        print(" early stopping")
+                        break  # early stop over dev curve
+                else:
+                    # track best features over training
+                    # here we control the best parameters retrieval
+                    self.best_dev = dev_acc[len(dev_acc) - 1]
+                    self.best_params = self.trainable_variables
+                    self.patience = 0
 
-                tf.print("Epoch:", (self.epoch + 1), "Cost:", avg_cost, \
-                         "Dev acc:", dev_acc[-1], \
-                         "Train acc:", train_acc[-1])
+                tf.print("Epoch:", (self.epoch + 1),
+                         "Dev acc:", self.evaluate_classifier(dev_data[0:1000]),
+                         "Train acc:", self.evaluate_classifier(training_data[0:1000]),
+                         "Avg Cost:", avg_cost,
+                         "total step Cost :", total_cost)
             self.epoch += 1
 
+        # retrieve best training features
+        self.trainable_variables = self.best_params
         return train_acc, dev_acc, epochs
 
     def classify(self, examples):
@@ -667,6 +734,7 @@ if not path.exists(model_path+"model.pickle"):
     # save model
     pickle_out = open(model_path+"model.pickle","wb")
     pickle.dump(classifier.package_params(), pickle_out)
+    # expected Test acc: 0.7894524959742351 (more less)
 else:
     print("model was found, we currently loading the model")
     # load model
@@ -674,10 +742,7 @@ else:
     classifier = SimmilarityClassifier(len(word_indices), Sentence_len, ind2label)
     classifier.setup_params(pickle.load(pickle_in))
     print("Test acc:", classifier.evaluate_classifier(test_set))
-
-# expected Test acc: 0.782608695652174
-
-# here we generate full understandable report (show the internal information) and check
-classifier.estimate_grade(search_examples(test_set[:50], 10), output_figures_path, "1_exp")
-classifier.estimate_grade(search_examples(test_set[50:100], 10), output_figures_path, "2_exp")
-classifier.estimate_grade(search_examples(test_set[100:150], 10), output_figures_path, "3_exp")
+    print("Test set composed by {} examples".format(len(test_set)))
+    # here we generate full understandable report (show the internal information) and check
+    classifier.estimate_grade(search_examples(test_set[:50], 10), output_figures_path, "1_exp")
+    # todo re-think about the gathering of representative samples
