@@ -13,8 +13,15 @@ from flair.models import SequenceTagger
 from segtok.segmenter import split_single
 # similarity imports (estimator)
 from semantic_text_similarity.models import WebBertSimilarity
-# retrieve / save models ( (de)serializtion protocol)
+# retrieve / save models (de)serializtion protocol
 import pickle
+import pprint
+# feedback
+import nltk
+from nltk.wsd import lesk
+from nltk.tokenize import word_tokenize
+from itertools import combinations, permutations
+
 
 '''
 Paths: Here we define the paths used by the whole script
@@ -225,8 +232,8 @@ Sentence_len = 20 # larger sentence 110
 
 # ----------------------------------------------------------------
 # Lauch loaders
-label2ind =  {"correct": 0,"incorrect": 1}
-ind2label = {0:"correct",1:"incorrect"}
+label2ind = {"correct": 0, "incorrect": 1}
+ind2label = {0: "correct", 1: "incorrect"}
 preprocessor = Preprocessor(Sentence_len, preprocess=False, labelmap=label2ind)
 preprocessor.split_semeval(input_path=data_path, output_path=data_preprocessed_path)
 # load the data
@@ -238,11 +245,14 @@ loaded_embeddings = preprocessor.load_embeddings(glove_home=embeddings_path)
 
 class SimmilarityClassifier():
 
-    def __init__(self, vocab_size, sequence_length, labelmap):
+    def __init__(self, vocab_size, sequence_length, labelmap, test = False):
         self.labelmap = labelmap
-        self.web_model = WebBertSimilarity(device='cpu', batch_size=10)  # defaults to GPU prediction
+        self.web_model = WebBertSimilarity(device='cpu', batch_size=1000)  # defaults to GPU prediction
         # Define the hyperparameters
-        self.training_epochs = 100  # How long to train for - chosen to fit within class time
+        if test:
+            self.training_epochs = 1  # How long to train for - chosen to fit within class time
+        else:
+            self.training_epochs = 100  # How long to train for - chosen to fit within class time
         self.display_epoch_freq = 1  # How often to print cost (in epochs)
         self.display_step_freq = 11  # How often to test (in steps)
         self.dim = sequence_length  # The dimension of the hidden state of each RNN
@@ -350,6 +360,114 @@ class SimmilarityClassifier():
         ind += 1
         self.b_cl = trainable_variables[ind]
 
+    def generate_assessment(self, examples, autocorrelation):
+        for n, example in enumerate(examples):
+            reference_ans = example["reference_answer"]
+            student_ans =  word_tokenize(example["student_answer"])
+            importance_vec = tf.unstack(tf.reduce_mean(autocorrelation[n], 0))
+            AnsWords = []
+            factors = [] # mask to detect the words to highlight on red (2) and green (1)
+            # discriminate wrong / correct words by correlation
+            # extract answer keywords
+            for ind, weight in enumerate(importance_vec): # retrieve incorrect words
+                if weight < 0:
+                    factors.append(2)
+                    AnsWords.append(" ")
+                elif  weight > 0:
+                    factors.append(1)
+                    AnsWords.append(student_ans[ind])
+
+            if example['estimated_score'] == 'incorrect':
+                # retrieve all possible correct senses for the reference (track reference variability)
+                list_lemmas = [reference_ans]
+                tokenized_sent = word_tokenize(reference_ans)
+                for i, token in enumerate(tokenized_sent):  # desambiguate semantic meaning using LESK (could be improved)
+                    synset = lesk(tokenized_sent, token)
+                    if synset:
+                        possible_lemmas = [" ".join(tokenized_sent[:i] + [lemma.name().lower()] + tokenized_sent[i + 1:]) for lemma in
+                                           synset.lemmas()]
+                        for lemma in possible_lemmas:
+                            similarity = self.web_model.predict([(reference_ans, lemma)])  # similarity range [0..5]
+                            if (similarity[0] > 4.7) and (lemma != reference_ans) and (lemma not in list_lemmas):  # if sufficient similarity confidence add new example
+                                list_lemmas.append(lemma)
+
+                # extract suitable combinations for certain keywords in front of a reference
+                def getFeedback(RefWords, AnsWords,reference_ans):
+                    RefWords = [word.lower() for word in RefWords if word not in AnsWords]
+                    fixed = 5
+
+                    ans2Improve = list(permutations(AnsWords, len(AnsWords)))
+                    ans2Improve = [list(tp) for tp in ans2Improve]
+
+                    combi = []
+                    for i in range(fixed):
+                        tmp_combi = list(combinations(RefWords, i+1))
+                        tmp_combi = [list(tp) for tp in tmp_combi]
+                        combi = combi + tmp_combi
+
+                    list2check = []
+                    for possible in ans2Improve:
+                        substitude = possible.index(" ")
+                        for comb in combi:
+                             tmp = possible.copy()
+                             check = tmp[:substitude] + comb + tmp[substitude+1:]
+                             list2check. append(check)
+
+
+                    mapped_comb = list(map(lambda x: " ".join(x), list2check))
+                    ref_list = [reference_ans] * len(mapped_comb)
+                    zipped_batch = list(zip(mapped_comb, ref_list))
+                    results = self.web_model.predict(zipped_batch[:1000])  # check 250 combinations (optimization pourposes)
+
+                    feedback_ideas = []
+                    for i, tmp in enumerate(results):
+                        tuple = zipped_batch[i]
+                        feedback = tuple[0].lower()
+                        if (tmp > 4.) and (feedback != reference_ans) and (
+                                feedback not in feedback_ideas):  # if sufficient similarity confidence add new example
+                                    tuple = (feedback,tmp)
+                                    feedback_ideas.append(tuple)
+                    return feedback_ideas
+
+                # extract keywords from reference
+                RefWords = []
+                for lemma in list_lemmas:
+                    solution2fit = word_tokenize(lemma)
+                    for token in solution2fit:
+                        if token not in RefWords:
+                            RefWords.append(token)
+
+                punct_marks = ['.','"',')','(',':','-','_',';',"'",'@', '[', ']',',']
+                RefWords = [word.lower() for word in RefWords if word not in punct_marks]# remove punctuation marks
+                RefWords = list(dict.fromkeys(RefWords))  # avoid repeated words
+                AnsWords = [word.lower() for word in AnsWords if word not in punct_marks]# remove punctuation marks
+                AnsWords = list(dict.fromkeys(AnsWords))  # avoid repeated words
+                feedback_ideas = getFeedback(RefWords, AnsWords,  reference_ans)
+
+                if (not feedback_ideas) :
+                    feedback_ideas = reference_ans
+                else:
+                    def sort_feedback(list_of_tuples):  # sort the list by the
+                        list_of_tuples.sort(key=lambda x: x[1], reverse=True)
+                        return list_of_tuples
+
+                    feedback_ideas = sort_feedback(feedback_ideas)
+                    feedback_ideas = feedback_ideas[0]
+
+            else:
+                if example['estimated_mark'] > 8:
+                    feedback_ideas = "very good, congratulations !"
+                elif example['estimated_mark'] > 6:
+                    feedback_ideas = "good !"
+                else:
+                    feedback_ideas = "passed, check the review"
+
+            tmp = {"feedback": feedback_ideas, "highlight_vector": factors}
+            example.update(tmp)
+            examples[n] = example
+
+        return examples
+
     # define the GRU function (Hint: check lab 5)
     # todo update into LSTM
     def gru(self, emb, h_prev, name):
@@ -374,6 +492,7 @@ class SimmilarityClassifier():
         attn_weights = self.get_attn(examples)
         avg_correlation_list = []
         avg_weights_list = []
+        autocorrelation_list = []
         for i in range(len(examples)):
             # x axis
             premise_tokens = [indices_to_words[index] for index in examples[i]['reference_answer_index_sequence']]
@@ -419,6 +538,7 @@ class SimmilarityClassifier():
             # data to show (pearson correlation)
             ax2 = fig.add_subplot(2, 2, 1)
             pearson_correlation = tfp.stats.auto_correlation(attn_weights[i, x_start_ind:, y_start_ind:])
+            autocorrelation_list.append(pearson_correlation)
             im2 = ax2.matshow(pearson_correlation, cmap='coolwarm')
 
             # Formatting for heat map 1.
@@ -450,39 +570,35 @@ class SimmilarityClassifier():
             plt.cla()
             plt.close()
 
-            #normalized_pearson_correlation = tf.map_fn(lambda x: x * 0.5 + 0.5, pearson_correlation)
-            #avg_correlation = tf.reduce_sum(normalized_pearson_correlation) / (len(normalized_pearson_correlation)*len(normalized_pearson_correlation[0]))
             avg_correlation = tf.reduce_sum(pearson_correlation) / (len(pearson_correlation) * len(pearson_correlation[0]))
             avg_correlation_list.append(avg_correlation)
 
             avg_weights = tf.reduce_sum(focused_weigths) / (len(focused_weigths) * len(focused_weigths[0]))
             avg_weights_list.append(avg_weights)
 
-        # plot avg_correlation line
-        # Basic Configuration
-        fig = plt.figure(figsize=(16, 16))
-        ax1 = fig.add_subplot(1, 2, 1)
-        ax2 = fig.add_subplot(1, 2, 2)
-
-        ax1.plot(range(len(examples)), avg_correlation_list, linestyle='--', marker='o', color='b')
-        ax1.set_title("semantics", y=0.1)
-
-        ax2.plot(range(len(examples)), avg_weights_list, linestyle='--', marker='o', color='r')
-        ax2.set_title("correctness", y=0.1)
-
-        fig.tight_layout()
-        plt.savefig(output_dir + title + str(i) + '_similarity_avg_line.pdf')
-        plt.clf()
-        plt.cla()
-        plt.close()
         with open(output_dir + title + str(i) + "_output.log", "w") as f:
             f.write("\n\n correlation report: \n")
             f.write(" question: {}".format(examples[0]["question"]))
-            for example in examples:
+            for n, example in enumerate(examples):
                 similarity = self.web_model.predict([(example["reference_answer"], example["student_answer"])])
                 grade = self.classify([example])
-                estimated_mark = int(2*similarity)
-                f.write(" \n given information:\n\n reference: {} \t\t answer: {} \n score: {} \n\n results:\n\n estimated similarity: {} \t\t estimated score: {} \t\t estimated mark: {} ".format(example["reference_answer"], example["student_answer"], example["grade"], similarity, self.labelmap[int(grade)], estimated_mark))
+                grade = self.labelmap[int(grade)]
+                if grade == "incorrect":
+                    estimated_mark = int(similarity)
+                else:
+                    estimated_mark = int(5+similarity)
+                tmpDict = {
+                    "reference": example["reference_answer"],
+                    "answer": example["student_answer"],
+                    "score": example["grade"],
+                    "estimated_similarity": similarity[0],
+                    "estimated_score": grade,
+                    "estimated_mark": estimated_mark,
+                }
+                example.update(tmpDict)
+                examples[n] = example
+
+        return examples, autocorrelation_list
 
     # Define the model: Complete the functions
     # paper = REASONING ABOUT ENTAILMENT WITH NEURAL ATTENTION (Rocktäschel's)
@@ -671,24 +787,6 @@ class SimmilarityClassifier():
         labels = [dataset[i]['label'] for i in indices]
         return premise_vectors, hypothesis_vectors, labels
 
-def search_examples(training_set, max_enum):
-    question = training_set[0]["question"]
-    ref = training_set[0]["reference_answer"]
-    nCorrect = 0
-    nIncorrect = 0
-    list_examples = []
-    for example in training_set:
-        if (example["question"]) in question and (example["reference_answer"] in ref):
-            if len(list_examples) == max_enum:
-                break
-            if ("incorrect" in example["grade"]) & (nIncorrect < int(max_enum/2)):
-                nIncorrect +=1
-                list_examples.append(example)
-            elif (example["grade"] in "correct") & (nCorrect < int(max_enum/2)):
-                nCorrect+=1
-                list_examples.append(example)
-    return list_examples
-
 def plot_learning_curve(par_values, train_scores, dev_scores, model_path, title="Learning Curve", xlab="", ylab="Accuracy",ylim=None):
     """
     Generate a simple plot of the test and training learning curve.
@@ -739,10 +837,57 @@ else:
     print("model was found, we currently loading the model")
     # load model
     pickle_in = open(model_path+"model.pickle", "rb")
-    classifier = SimmilarityClassifier(len(word_indices), Sentence_len, ind2label)
+    # loaded model, enabled reinforced learning ...
+    classifier = SimmilarityClassifier(len(word_indices), Sentence_len, ind2label, test=True)
     classifier.setup_params(pickle.load(pickle_in))
+
     print("Test acc:", classifier.evaluate_classifier(test_set))
     print("Test set composed by {} examples".format(len(test_set)))
-    # here we generate full understandable report (show the internal information) and check
-    classifier.estimate_grade(search_examples(test_set[:50], 10), output_figures_path, "1_exp")
-    # todo re-think about the gathering of representative samples
+
+    # here we generate full understandable report (show the internal information) and check for the example
+    example = list(training_set[:1])
+    examples, autocorrelation = classifier.estimate_grade(example, output_figures_path, "1_exp")
+    feedbacks = classifier.generate_assessment(examples, autocorrelation)
+    for feedback in feedbacks:
+        if feedback['estimated_score'] != feedback['score']:
+            print("failed, tuning a bit ... please wait")
+            # reinforced learning
+            train_acc, dev_acc, epochs = classifier.train(training_set, test_set)  # 1 epochs ...
+            train_acc, dev_acc, epochs = classifier.train(dev_set, test_set)
+
+            example = list(training_set[:1])
+            examples, autocorrelation = classifier.estimate_grade(example, output_figures_path, "1_exp")
+            feedbacks = classifier.generate_assessment(examples, autocorrelation)
+
+    class bcolors:
+        OKGREEN = '\033[92m'
+        FAIL = '\033[91m'
+
+    for feedback in feedbacks:
+        answer = feedback['answer']
+        tokens = word_tokenize(answer)
+        highligth_vec = feedback['highlight_vector']
+        result = f""
+        for n, token in enumerate(tokens):
+            try:
+                if highligth_vec[n] == 2:
+                    result += str(bcolors.FAIL) + token + " "
+                elif highligth_vec[n] == 1:
+                    result += str(bcolors.OKGREEN) + token + " "
+            except:
+                pass
+
+        print("\n")
+        print("was estimated as: {}".format(feedback['estimated_score']))
+        print("was graded as: {}".format(feedback['estimated_mark']))
+        print("was really: {}".format(feedback['score']))
+        print("\n")
+        print("The feedback was:")
+        print(feedback['feedback'])
+        print("The reference was:")
+        print(feedback['reference_answer'])
+        print("\n")
+        print("The question was:")
+        print(feedback['question'])
+        print("The answer was:")
+        print(result)
