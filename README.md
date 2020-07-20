@@ -6,4 +6,4 @@ To understand the overall system we add the presentation file were we explain th
 
 Note: the model is dependent on external libraries that will be installed, so the first run may take a while on installing the dependencies.
 
-Edgar Andrés and Mohammed Yassin.
+Edgar Andrés and Mohamed Yassin.
